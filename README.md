@@ -34,10 +34,10 @@ When PostgreSQL updates a record it creates a new version (a copy) of the record
 
 The problem is that PostgreSQL by default fills 100% of a page in a table before splitting.  This means that there likely won't be room for this operation and some Senzing tables are updated frequently.  The negative of reducing the fillfactor is that it may increase diskspace.  You may want to experiment with this yourself but for performance runs I set the following:
 
-`
+```
 ALTER TABLE RES_RELATE SET ( fillfactor = 50);
 ALTER TABLE RES_FEAT_STAT SET ( fillfactor = 50);
 ALTER TABLE RES_FEAT_EKEY SET ( fillfactor = 50);
 ALTER TABLE RES_ENT SET ( fillfactor = 50);
 ALTER TABLE OBS_ENT SET ( fillfactor = 50);
-`
+```
