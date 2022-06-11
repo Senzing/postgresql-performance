@@ -37,6 +37,23 @@ In this repository you will find a `partitioning_mods.sql` file for the previous
 ## Governor
 Recommend setting the thresholds to 1.2B/1.5B to allow for more time to vacuum.  Also, the smaller difference in the values can help prevent the cost of expensive "double vacuum" where a "pause" is needed immediately after the initial vacuum as the XID is not dropped far enough.  I saw a reduction from 2-4hrs to <1hr in wait time on average by doing this.
 
+Along with those governor changes, you can make autovacuum be more aggressive and less likely to hit an expensive autovacuum with these settings:
+```
+autovacuum_max_workers=16
+autovacuum_vacuum_cost_limit =10000
+autovacuum_vacuum_cost_delay=0
+autovacuum_work_mem = 512MB
+autovacuum_naptime = 5s
+autovacuum_vacuum_insert_threshold = 1000
+autovacuum_vacuum_insert_scale_factor = 0
+autovacuum_vacuum_scale_factor = 0
+autovacuum_analyze_scale_factor = 0.5
+autovacuum_freeze_max_age = 1000000000
+autovacuum_multixact_freeze_max_age = 1200000000
+```
+
+The best setting for you may be different depending on the system you have.
+
 
 ## Auto-vacuuming
 Keep the system in regular vacuum as much as possible.  The aggressive vacuum causes massive IO, making the cost 100x more expensive.  Partitioning of the hottest tables can help regular autovacuum keep up longer.
