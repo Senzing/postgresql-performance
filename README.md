@@ -1,6 +1,6 @@
 # postgresql-performance
 
-This repository is to document specific tweaks to PostgreSQL and the Senzing DDL that may be useful for larger installations.
+This repository is to document specific tweaks to PostgreSQL and the Senzing DDL that may be useful for larger installations.  Definitely add your own comments/experiences as GitHub issues in this repository.
 
 
 ## Fundamentals
@@ -18,7 +18,20 @@ lz4 TOAST compression may be a small win as it has significantly higher compress
 
 
 ## Partitioning
-Partitioning can be very effective for Senzing.  Autovacuum, backup, and restore are all single threaded operations per table in PostgreSQL.  By partitioning Senzing, you can achieve substantially better parallelization of these operations.
+Partitioning can be very effective for Senzing.  Autovacuum, backup, and restore are all single threaded operations per table in PostgreSQL.  By partitioning Senzing, you can achieve substantially better parallelization of these operations.  Some obvious tables to partition are:
+
+```
+RES_FEAT_EKEY
+RES_FEAT_STAT
+RES_ENT
+DSRC_RECORD
+```
+
+It would be nice to partition LIB_FEAT and OBS_ENT also but they have 2 unique indexes which makes it incompatible with PostgreSQL partitioning.  Fortunately, I've found that LIB_FEAT and OBS_ENT rarely a vacuum problem and, over time, will become more read heavy.
+
+Of course, some queries select records without including the partition key and instead use the secondary indexes.  This will use more CPU as they broadcast out the request to all partitions but, in my experience, vacuum and other operational issues are for more important than DB CPU.
+
+In this repository you will find a `partitioning_mods.sql` file for the previously mentioned tables.
 
 
 ## Governor
@@ -35,9 +48,13 @@ When PostgreSQL updates a record it creates a new version (a copy) of the record
 The problem is that PostgreSQL by default fills 100% of a page in a table before splitting.  This means that there likely won't be room for this operation and some Senzing tables are updated frequently.  The negative of reducing the fillfactor is that it may increase diskspace.  You may want to experiment with this yourself but for performance runs I set the following:
 
 ```
-ALTER TABLE RES_RELATE SET ( fillfactor = 50);
+ALTER TABLE RES_RELATE SET ( fillfactor = 50 );
 ALTER TABLE RES_FEAT_STAT SET ( fillfactor = 50);
 ALTER TABLE RES_FEAT_EKEY SET ( fillfactor = 50);
 ALTER TABLE RES_ENT SET ( fillfactor = 50);
 ALTER TABLE OBS_ENT SET ( fillfactor = 50);
+ALTER TABLE DSRC_RECORD SET ( fillfactor = 50);
 ```
+
+NOTE: That if you have partitioned tables, this much be done on each partition.
+
