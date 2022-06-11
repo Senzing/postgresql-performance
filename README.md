@@ -29,3 +29,15 @@ Recommend setting the thresholds to 1.2B/1.5B to allow for more time to vacuum. 
 Keep the system in regular vacuum as much as possible.  The aggressive vacuum causes massive IO, making the cost 100x more expensive.  Partitioning of the hottest tables can help regular autovacuum keep up longer.
 
 
+## Fillfactor
+When PostgreSQL updates a record it creates a new version (a copy) of the record with the update.  If this can be done 1) without modifying an index and 2) with putting the copy in the same page as the old version, then this change does not contribute to additional vacuum workload.  In fact, the old copies can even be cleaned up during select operations.
+
+The problem is that PostgreSQL by default fills 100% of a page in a table before splitting.  This means that there likely won't be room for this operation and some Senzing tables are updated frequently.  The negative of reducing the fillfactor is that it may increase diskspace.  You may want to experiment with this yourself but for performance runs I set the following:
+
+`
+ALTER TABLE RES_RELATE SET ( fillfactor = 50);
+ALTER TABLE RES_FEAT_STAT SET ( fillfactor = 50);
+ALTER TABLE RES_FEAT_EKEY SET ( fillfactor = 50);
+ALTER TABLE RES_ENT SET ( fillfactor = 50);
+ALTER TABLE OBS_ENT SET ( fillfactor = 50);
+`
