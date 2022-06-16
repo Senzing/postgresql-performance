@@ -6,6 +6,8 @@ This repository is to document specific tweaks to PostgreSQL and the Senzing DDL
 ## Fundamentals
 A DBA needs to tune PostgreSQL for the available hardware... shared_buffers, worker memory, IO, etc.  The one "unusual" thing about Senzing is that it largerly runs in auto-commit mode which means that commit performance has a lot to do with overall performance, 10x+ so.  You can check single connection insert performance with `G2Command` and the `checkDBPerf -s 3` command.  Ideally you should get <.5ms per insert or 6000 inserts in 3 seconds.  Many systems, even cloud systems, will achieve .1-.3ms.
 
+You can also use psql to the PostgreSQL database from the same environment you are running the Senzing API to check network performance.  Use `\timing` to enable timings and `select 1;` to check the roundtrip performance.  Since this does not leverage the Senzing schema or the database IO subsystem, if this is slow it is pure networking/connection overhead.
+
 The primary configuration parameter to improve commit performance is to turn off disk flushes on commit with `synchronous_commit=off`.
 
 There is more to pay attention to on your system though.  For instance, if replication is done synchronously then you end up with the same problem.  On AWS Aurora, replication to a different AZ forces synchronous commit back on.  As you are looking at the design of your database infrastructure, you will need to take these things into consideration.  To simplify things, customers will often do the initial historical loads without replication and set it up afterward when the DB performance needs tend to be much lower.
