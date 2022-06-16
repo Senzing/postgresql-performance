@@ -41,13 +41,7 @@ Along with those governor changes, you can make autovacuum be more aggressive an
 ```
 autovacuum_max_workers=16
 autovacuum_vacuum_cost_limit =10000
-autovacuum_vacuum_cost_delay=0
 autovacuum_work_mem = 512MB
-autovacuum_naptime = 5s
-autovacuum_vacuum_insert_threshold = 1000
-autovacuum_vacuum_insert_scale_factor = 0
-autovacuum_vacuum_scale_factor = 0
-autovacuum_analyze_scale_factor = 0.5
 autovacuum_freeze_max_age = 1000000000
 autovacuum_multixact_freeze_max_age = 1200000000
 ```
@@ -66,11 +60,11 @@ The problem is that PostgreSQL by default fills 100% of a page in a table before
 
 ```
 ALTER TABLE RES_RELATE SET ( fillfactor = 50 );
-ALTER TABLE RES_FEAT_STAT SET ( fillfactor = 50);
-ALTER TABLE RES_FEAT_EKEY SET ( fillfactor = 50);
-ALTER TABLE RES_ENT SET ( fillfactor = 50);
-ALTER TABLE OBS_ENT SET ( fillfactor = 50);
-ALTER TABLE DSRC_RECORD SET ( fillfactor = 50);
+ALTER TABLE RES_FEAT_STAT SET ( fillfactor = 50 );
+ALTER TABLE RES_FEAT_EKEY SET ( fillfactor = 50 );
+ALTER TABLE RES_ENT SET ( fillfactor = 50 );
+ALTER TABLE OBS_ENT SET ( fillfactor = 50 );
+ALTER TABLE DSRC_RECORD SET ( fillfactor = 50 );
 ```
 
 NOTE: That if you have partitioned tables, this much be done on each partition.
