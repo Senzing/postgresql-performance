@@ -42,8 +42,7 @@ Recommend setting the thresholds to 1.2B/1.5B to allow for more time to vacuum. 
 Along with those governor changes, you can make autovacuum be more aggressive and less likely to hit an expensive autovacuum with these settings:
 ```
 autovacuum_max_workers=16
-autovacuum_vacuum_cost_limit =10000
-autovacuum_work_mem = 512MB
+autovacuum_vacuum_cost_limit = 10000
 autovacuum_freeze_max_age = 1000000000
 autovacuum_multixact_freeze_max_age = 1200000000
 ```
