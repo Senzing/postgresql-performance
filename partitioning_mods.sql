@@ -15,7 +15,7 @@ CREATE TABLE RES_FEAT_EKEY_9 PARTITION OF RES_FEAT_EKEY FOR VALUES WITH (modulus
 
 -- note that the default schema has this as a unique index but it is just the same fields in a different order from the primary key so it does not need to be unique
 -- CREATE INDEX RES_FEAT_EKEY_SK ON RES_FEAT_EKEY(RES_ENT_ID, LENS_ID, LIB_FEAT_ID, UTYPE_CODE) ;
-CREATE INDEX RES_FEAT_EKEY_HASH ON RES_FEAT_EKEY(RES_ENT_ID);
+CREATE INDEX RES_FEAT_EKEY_HASH ON RES_FEAT_EKEY USING HASH (RES_ENT_ID);
 
 
 -- DANGER: DROP TABLE RES_FEAT_STAT;
