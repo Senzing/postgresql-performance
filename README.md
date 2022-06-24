@@ -70,3 +70,28 @@ ALTER TABLE DSRC_RECORD SET ( fillfactor = 50 );
 
 NOTE: That if you have partitioned tables, this much be done on each partition.
 
+
+## Memory issues
+When trying 450M records in the heavily partitioned schema, I found postgresql triggering the Linux OOM killer around 300M records.  This would happen repeatedly but made no sense as this dedicated DB server has 1.5TB RAM and 100GB of shared_buffers.  In doing some reviews, it appears that the kernel overcommit settings/algorithms just aren't good for this.  Oddly, the issue did not occur with lesser partitioning with the exact same data.
+
+Setting these kernel parameters resolved the issue:
+
+```
+vm.overcommit_memory=2
+vm.overcommit_ratio=90
+```
+
+## LUKS disk encryption
+I do my performance runs with full disk encryption using Linux LUKS on LVM, mdraid0, etc.  This tries to characterize real world and not ideal workloads.  There are some parameters to the crypt devices that can be helpful and more coming in newer kernels.
+
+```
+Ubuntu 20.04 w/ 5.4 kernel
+cryptsetup --perf-submit_from_crypt_cpus --allow-discards --persistent refresh <device>
+
+Newer kernels (to be tested):
+cryptsetup --allow-discards -perf-no_read_workqueue --perf-no_write_workqueue --persistent refresh
+```
+
+
+
+
