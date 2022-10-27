@@ -47,7 +47,39 @@ autovacuum_freeze_max_age = 1000000000
 autovacuum_multixact_freeze_max_age = 1200000000
 ```
 
-The best setting for you may be different depending on the system you have.
+The best setting for you may be different depending on the system you have.  I run pretty aggressively like:
+```
+checkpoint_timeout = 2min               # range 30s-1d
+checkpoint_completion_target = 0.9      # checkpoint target duration, 0.0 - 1.0
+max_wal_size = 80GB
+min_wal_size = 80GB
+autovacuum_max_workers=16
+autovacuum_vacuum_cost_limit = 10000
+autovacuum_freeze_max_age = 1000000000
+autovacuum_multixact_freeze_max_age = 1200000000
+autovacuum_vacuum_threshold = 10000000  # min number of row updates before
+                                        # vacuum
+autovacuum_vacuum_insert_threshold = 10000000   # min number of row inserts
+                                        # before vacuum; -1 disables insert
+                                        # vacuums
+autovacuum_analyze_threshold = 0        # min number of row updates before
+                                        # analyze
+autovacuum_analyze_scale_factor = 0.2   # fraction of table size before analyze
+autovacuum_vacuum_scale_factor = 0      # fraction of table size before vacuum
+autovacuum_vacuum_insert_scale_factor = 0       # fraction of inserts over table
+                                        # size before insert vacuum
+autovacuum_vacuum_cost_delay = 1ms      # default vacuum cost delay for
+                                        # autovacuum, in milliseconds;
+                                        # -1 means use vacuum_cost_delay
+                                        log_autovacuum_min_duration = 100000    # log autovacuum activity;
+                                        # -1 disables, 0 logs all actions and
+                                        # their durations, > 0 logs only
+                                        # actions running at least this number
+                                        # of milliseconds.
+log_checkpoints = on
+
+default_toast_compression = 'lz4'       # 'pglz' or 'lz4'
+```
 
 
 ## Auto-vacuuming
@@ -83,6 +115,8 @@ vm.overcommit_ratio=90
 
 ## LUKS disk encryption
 I do my performance runs with full disk encryption using Linux LUKS on LVM, mdraid0, etc.  This tries to characterize real world and not ideal workloads.  There are some parameters to the crypt devices that can be helpful and more coming in newer kernels.
+
+** Note that I tried the newer kernel settings and it was terrible.  More to look at here though.
 
 ```
 Ubuntu 20.04 w/ 5.4 kernel
