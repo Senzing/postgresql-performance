@@ -123,7 +123,7 @@ Ubuntu 20.04 w/ 5.4 kernel
 cryptsetup --perf-submit_from_crypt_cpus --allow-discards --persistent refresh <device>
 
 Newer kernels (to be tested):
-cryptsetup --allow-discards -perf-no_read_workqueue --perf-no_write_workqueue --persistent refresh
+cryptsetup --allow-discards --perf-no_read_workqueue --perf-no_write_workqueue --persistent refresh <device>
 ```
 
 
