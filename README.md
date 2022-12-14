@@ -79,6 +79,7 @@ autovacuum_vacuum_cost_delay = 1ms      # default vacuum cost delay for
 log_checkpoints = on
 
 default_toast_compression = 'lz4'       # 'pglz' or 'lz4'
+enable_seqscan = off
 ```
 
 
