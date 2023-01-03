@@ -117,7 +117,7 @@ vm.overcommit_ratio=90
 ## LUKS disk encryption
 I do my performance runs with full disk encryption using Linux LUKS on LVM, mdraid0, etc.  This tries to characterize real world and not ideal workloads.  There are some parameters to the crypt devices that can be helpful and more coming in newer kernels.
 
-** Note that I tried the newer kernel settings and it was terrible.  More to look at here though.
+** Note that I tried this and it works really well for a short period of time.  The problem is that the newer settings make the encryption happen in process.  This works great EXCEPT for kernel page flushing and checkpointing which are single process/thread operations.  The database can actually run out of space because WAL logs fill up the disk.
 
 ```
 Ubuntu 20.04 w/ 5.4 kernel
