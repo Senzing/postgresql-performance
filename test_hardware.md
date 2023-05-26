@@ -17,9 +17,9 @@ Each node does have 1TB of NVMe local but only the DB server needs flash storage
 # Specifications
 
 ## Infrastructure Server
- - Dell R820
- - (4) Intel(R) Xeon(R) CPU E5-4650 0 @ 2.70GHz
- - 512GB RAM
+ - Custom 2U
+ - Intel i5-13600
+ - 128GB RAM
 
 ## Process Server
  - Dell R820
@@ -31,4 +31,4 @@ Each node does have 1TB of NVMe local but only the DB server needs flash storage
  - (2) Intel(R) Xeon(R) Gold 6252 CPU @ 2.10GHz
  - 1.5TB RAM (bufferpool at 384GB hugepages)
  - 20T NVMe (4 Optane + 8 Samsung 9xx mixed 970/980)
- - -  mdraid 0, LUKS encryption, ext4
+ - -  mdraid 0, LUKS encryption (4k sectors), ext4
