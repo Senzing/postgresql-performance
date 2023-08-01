@@ -117,7 +117,7 @@ vm.overcommit_ratio=90
 ## LUKS disk encryption
 I do my performance runs with full disk encryption using Linux LUKS on LVM, mdraid0, etc.  This tries to characterize real world and not ideal workloads.  There are some parameters to the crypt devices that can be helpful and more coming in newer kernels.
 
-** Note that I tried this and it works really well for a short period of time.  The problem is that the newer settings make the encryption happen in process.  This works great EXCEPT for kernel page flushing and checkpointing which are single process/thread operations.  The database can actually run out of space because WAL logs fill up the disk.
+** Note that I tried this and it works really well for a short period of time.  The problem is that the newer settings make the encryption happen in process.  This works great EXCEPT for kernel page flushing and checkpointing which are single process/thread operations.  The database can actually run out of space because WAL logs fill up the disk.  Depending on your write performance it may be beneficial to set no_read_workqueue but leave the write queue alone.
 
 ```
 Ubuntu 20.04 w/ 5.4 kernel
@@ -126,6 +126,23 @@ cryptsetup --allow-discards --persistent refresh <device>
 Newer kernels (to be tested):
 cryptsetup --allow-discards --perf-no_read_workqueue --perf-no_write_workqueue --persistent refresh <device>
 ```
+
+## IO concurrency
+```
+effective_io_concurrency = 10           # 1-1000; 0 disables prefetching
+maintenance_io_concurrency = 1000 # 1-1000; 0 disables prefetching
+```
+I tend to use the above settings.  It is also important to set the block device read-ahead too.  I will set the nvme device read ahead to 0 and the MD RAID and DM devices to 10.  Seems to improve IO scaling.  Something like this:
+
+```
+blockdev --report
+blockdev --setra 10 /dev/md127
+blockdev --setra 10 /dev/dm-2
+blockdev --setra 10 /dev/dm-3
+blockdev --setra 0 /dev/nvme*n1
+blockdev --report
+```
+
 
 
 
