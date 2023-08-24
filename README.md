@@ -2,6 +2,8 @@
 
 This repository is to document specific tweaks to PostgreSQL and the Senzing DDL that may be useful for larger installations.  Definitely add your own comments/experiences as GitHub issues in this repository.
 
+If you haven't already taken a look at the general performance document, please do: https://github.com/Senzing/performance-general/blob/main/README.md
+
 
 ## Fundamentals
 A DBA needs to tune PostgreSQL for the available hardware... shared_buffers, worker memory, IO, etc.  The one "unusual" thing about Senzing is that it largerly runs in auto-commit mode which means that commit performance has a lot to do with overall performance, 10x+ so.  You can check single connection insert performance with `G2Command` and the `checkDBPerf -s 3` command.  Ideally you should get <.5ms per insert or 6000 inserts in 3 seconds.  Many systems, even cloud systems, will achieve .1-.3ms.
