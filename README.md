@@ -21,6 +21,23 @@ This version has specific improvements to the handling of transactions and idle 
 lz4 TOAST compression may be a small win as it has significantly higher compression speeds.  In theory this should reduce latency.  It can be enabled with `default_toast_compression='lz4'` on a new system.
 
 
+## BufferMapping and waits
+This is a nice wait query that I like to run during loads to see what the database is waiting on.
+
+```
+watch psql -U postgres -w -h 127.0.0.1 g2 -c "\"select extract('epoch' from now()-xact_start) as duration, wait_event_type, wait_event, state, query from pg_stat_activity where state != 'idle' and (wait_event_type != '' or query like '%vacuum%') order by duration desc\""
+```
+
+One thing you will find is that once you are seeing lots of LWLock:BufferMapping waits, then adding more connections to the database is unlikely to scale.  PostgreSQL has 128 "buffer partitions," and when a select is looking to allocate memory to return results, it locks one of those partitions.  This means that once your workload shows heavy LWLock:BufferMapping waits, you need to look at a few options to continue scaling:
+* Move to DB clustering: Using either https://senzing.zendesk.com/hc/en-us/articles/360010599254-Scaling-Out-Your-Database-With-Clustering or some tables may work well with more traditional database clustering
+* Reduce the size of selects: If you increased generics thresholds for ingest and/or have keys causing entities to be highly related, you may want to revisit it
+
+Here is an example of a load where the number of loading threads was changed from 768 to 384 to 192.  The dips are when the loaders were restarted with new settings.  Only at 192 did BufferMapping essentially disappear from being a wait event with performance dropping <5% which could likely be recovered by increasing the threads slightly.
+![image](https://github.com/Senzing/postgresql-performance/assets/24964308/de79e8f2-96f3-41b7-87cb-7ca00071ef43)
+
+The other side effect of monitoring BufferMapping is with autovacuum.  Autovacuum leverages those same buffers and contention on them severely impacts the ability for autovacuum to keep up.  In the load above, autovacuum was taking 6 times longer when there was contention.
+
+
 ## Partitioning
 Partitioning can be very effective for Senzing.  Autovacuum, backup, and restore are all single threaded operations per table in PostgreSQL.  By partitioning Senzing, you can achieve substantially better parallelization of these operations.  Some obvious tables to partition are:
 
