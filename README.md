@@ -6,7 +6,7 @@ If you haven't already taken a look at the general performance document, please 
 
 
 ## Fundamentals
-A DBA needs to tune PostgreSQL for the available hardware... shared_buffers, worker memory, IO, etc.  The one "unusual" thing about Senzing is that it largerly runs in auto-commit mode which means that commit performance has a lot to do with overall performance, 10x+ so.  You can check single connection insert performance with `G2Command` and the `checkDBPerf -s 3` command.  Ideally you should get <.5ms per insert or 6000 inserts in 3 seconds.  Many systems, even cloud systems, will achieve .1-.3ms.
+A DBA needs to tune PostgreSQL for the available hardware... shared_buffers, worker memory, IO, etc.  The one "unusual" thing about Senzing is that it largely runs in auto-commit mode, which means that commit performance has a lot to do with overall performance, 10x+ so.  You can check single connection insert performance with `G2Command` and the `checkDBPerf -s 3` command.  Ideally, you should get <.5ms per insert or 6000 inserts in 3 seconds.  Many systems, even cloud systems, will achieve .1-.3ms.
 
 You can also use psql to the PostgreSQL database from the same environment you are running the Senzing API to check network performance.  Use `\timing` to enable timings and `select 1;` to check the roundtrip performance.  Since this does not leverage the Senzing schema or the database IO subsystem, if this is slow it is pure networking/connection overhead.
 
@@ -16,30 +16,31 @@ There is more to pay attention to on your system though.  For instance, if repli
 
 
 ## PostgreSQL 14
-This version has specific improvements to the handling of transactions and idle connections that can give substantional benefits for running OLTP applications like Senzing.  You can see if you are being impacted by the on previous versions of PostgreSQL by running `perf top` and looking for GetSnapshotData using significant CPU while the system is under load.  In my tests, this function was the largest consumer of CPU on the entire system.  This optimization is automatically enabled when you install 14.
+This version has specific improvements to the handling of transactions and idle connections that can give substantial benefits for running OLTP applications like Senzing.  You can see if you are being impacted by the on previous versions of PostgreSQL by running `perf top` and looking for GetSnapshotData using significant CPU while the system is under load.  In my tests, this function was the largest consumer of CPU on the entire system.  This optimization is automatically enabled when you install 14.
 
-lz4 TOAST compression may be a small win as it has significantly higher compression speeds.  In theory this should reduce latency.  It can be enabled with `default_toast_compression='lz4'` on a new system.
+lz4 TOAST compression may be a small win as it has significantly higher compression speeds.  In theory, this should reduce latency.  It can be enabled with `default_toast_compression='lz4'` on a new system.
 
 
 ## BufferMapping and waits
-This is a nice wait query that I like to run during loads to see what the database is waiting on.
+There are nice wait queries that I like to run during loads to see what the database is waiting on.
 
 ```
 watch psql -U postgres -w -h 127.0.0.1 g2 -c "\"select extract('epoch' from now()-xact_start) as duration, wait_event_type, wait_event, state, query from pg_stat_activity where state != 'idle' and (wait_event_type != '' or query like '%vacuum%') order by duration desc\""
+watch psql -U postgres -w -h 127.0.0.1 g2 -c "\"select count(*) as cnt, wait_event_type, wait_event from pg_stat_activity where state != 'idle'  and wait_event_type != '' group by wait_event_type, wait_event having count(*) > 1 order by cnt desc\""
 ```
 
 One thing you will find is that once you are seeing lots of LWLock:BufferMapping waits, then adding more connections to the database is unlikely to scale.  PostgreSQL has 128 "buffer partitions," and when a select is looking to allocate memory to return results, it locks one of those partitions.  This means that once your workload shows heavy LWLock:BufferMapping waits, you need to look at a few options to continue scaling:
 * Move to DB clustering: Using either https://senzing.zendesk.com/hc/en-us/articles/360010599254-Scaling-Out-Your-Database-With-Clustering or some tables may work well with more traditional database clustering
 * Reduce the size of selects: If you increased generics thresholds for ingest and/or have keys causing entities to be highly related, you may want to revisit it
 
-Here is an example of a load where the number of loading threads was changed from 768 to 384 to 192.  The dips are when the loaders were restarted with new settings.  Only at 192 did BufferMapping essentially disappear from being a wait event with performance dropping <5% which could likely be recovered by increasing the threads slightly.
+Here is an example of a load where the number of loading threads was changed from 768 to 384 to 192.  The dips are when the loaders were restarted with new settings.  Only at 192 did BufferMapping essentially disappear from being a wait event with performance dropping <5%, which could likely be recovered by increasing the threads slightly.
 ![image](https://github.com/Senzing/postgresql-performance/assets/24964308/de79e8f2-96f3-41b7-87cb-7ca00071ef43)
 
-The other side effect of monitoring BufferMapping is with autovacuum.  Autovacuum leverages those same buffers and contention on them severely impacts the ability for autovacuum to keep up.  In the load above, autovacuum was taking 6 times longer when there was contention.
+The other side effect of monitoring BufferMapping is with autovacuum.  Autovacuum leverages those same buffers, and contention on them severely impacts the ability for autovacuum to keep up.  In the load above, the autovacuum was taking several times longer when there was contention.
 
 
 ## Partitioning
-Partitioning can be very effective for Senzing.  Autovacuum, backup, and restore are all single threaded operations per table in PostgreSQL.  By partitioning Senzing, you can achieve substantially better parallelization of these operations.  Some obvious tables to partition are:
+Partitioning can be very effective for Senzing.  Autovacuum, backup, and restore are all single-threaded operations per table in PostgreSQL.  By partitioning Senzing, you can achieve substantially better parallelization of these operations.  Some obvious tables to partition are:
 
 ```
 RES_FEAT_EKEY
@@ -48,17 +49,17 @@ RES_ENT
 DSRC_RECORD
 ```
 
-It would be nice to partition LIB_FEAT and OBS_ENT also but they have 2 unique indexes which makes it incompatible with PostgreSQL partitioning.  Fortunately, I've found that LIB_FEAT and OBS_ENT rarely a vacuum problem and, over time, will become more read heavy.
+It would be nice to partition LIB_FEAT and OBS_ENT also but they have 2 unique indexes which makes it incompatible with PostgreSQL partitioning.  Fortunately, I've found that LIB_FEAT and OBS_ENT rarely have a vacuum problem and, over time, will become more read heavy.
 
 Of course, some queries select records without including the partition key and instead use the secondary indexes.  This will use more CPU as they broadcast out the request to all partitions but, in my experience, vacuum and other operational issues are for more important than DB CPU.
 
-In this repository you will find a `partitioning_mods.sql` file for the previously mentioned tables.
+In this repository, you will find a `partitioning_mods.sql` file for the previously mentioned tables.
 
 
 ## Governor
-Recommend setting the thresholds to 1.2B/1.5B to allow for more time to vacuum.  Also, the smaller difference in the values can help prevent the cost of expensive "double vacuum" where a "pause" is needed immediately after the initial vacuum as the XID is not dropped far enough.  I saw a reduction from 2-4hrs to <1hr in wait time on average by doing this.
+Recommend setting the thresholds to 1.2B/1.5B to allow for more time to vacuum.  Also, the smaller difference in the values can help prevent the cost of expensive "double vacuum" where a "pause" is needed immediately after the initial vacuum as the XID is not dropped far enough.  I saw a reduction from 2-4 hours to <1hr in wait time on average by doing this.
 
-Along with those governor changes, you can make autovacuum be more aggressive and less likely to hit an expensive autovacuum with these settings:
+Along with those governor changes, you can make the autovacuum more aggressive and less likely to hit an expensive autovacuum with these settings:
 ```
 autovacuum_max_workers=16
 autovacuum_vacuum_cost_limit = 10000
@@ -109,7 +110,7 @@ Keep the system in regular vacuum as much as possible.  The aggressive vacuum ca
 ## Fillfactor
 When PostgreSQL updates a record it creates a new version (a copy) of the record with the update.  If this can be done 1) without modifying an index and 2) with putting the copy in the same page as the old version, then this change does not contribute to additional vacuum workload.  In fact, the old copies can even be cleaned up during select operations.
 
-The problem is that PostgreSQL by default fills 100% of a page in a table before splitting.  This means that there likely won't be room for this operation and some Senzing tables are updated frequently.  The negative of reducing the fillfactor is that it may increase diskspace.  You may want to experiment with this yourself but for performance runs I set the following:
+The problem is that PostgreSQL by default fills 100% of a page in a table before splitting.  This means that there likely won't be room for this operation and some Senzing tables are updated frequently.  The negative of reducing the fillfactor is that it may increase disk space.  You may want to experiment with this yourself but for performance runs, I set the following:
 
 ```
 ALTER TABLE RES_RELATE SET ( fillfactor = 50 );
@@ -120,11 +121,11 @@ ALTER TABLE OBS_ENT SET ( fillfactor = 50 );
 ALTER TABLE DSRC_RECORD SET ( fillfactor = 50 );
 ```
 
-NOTE: That if you have partitioned tables, this much be done on each partition.
+NOTE: If you have partitioned tables, this must be done on each partition.
 
 
 ## Memory issues
-When trying 450M records in the heavily partitioned schema, I found postgresql triggering the Linux OOM killer around 300M records.  This would happen repeatedly but made no sense as this dedicated DB server has 1.5TB RAM and 100GB of shared_buffers.  In doing some reviews, it appears that the kernel overcommit settings/algorithms just aren't good for this.  Oddly, the issue did not occur with lesser partitioning with the exact same data.
+When trying 450M records in the heavily partitioned schema, I found Postgresql triggering the Linux OOM killer around 300M records.  This would happen repeatedly but made no sense as this dedicated DB server has 1.5TB RAM and 100GB of shared_buffers.  In doing some reviews, it appears that the kernel overcommit settings/algorithms just aren't good for this.  Oddly, the issue did not occur with lesser partitioning with the exact same data.
 
 Setting these kernel parameters resolved the issue:
 
@@ -151,7 +152,7 @@ cryptsetup --allow-discards --perf-no_read_workqueue --perf-no_write_workqueue -
 effective_io_concurrency = 10           # 1-1000; 0 disables prefetching
 maintenance_io_concurrency = 1000 # 1-1000; 0 disables prefetching
 ```
-I tend to use the above settings.  It is also important to set the block device read-ahead too.  I will set the nvme device read ahead to 0 and the MD RAID and DM devices to 10.  Seems to improve IO scaling.  Something like this:
+I tend to use the above settings.  It is also important to set the block device read-ahead too.  I will set the NVME device read ahead to 0 and the MD RAID and DM devices to 10.  Seems to improve IO scaling.  Something like this:
 
 ```
 blockdev --report
