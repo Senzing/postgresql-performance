@@ -21,6 +21,16 @@ This version has specific improvements to the handling of transactions and idle 
 lz4 TOAST compression may be a small win as it has significantly higher compression speeds.  In theory, this should reduce latency.  It can be enabled with `default_toast_compression='lz4'` on a new system.
 
 
+## Well JIT!
+![image](https://github.com/Senzing/postgresql-performance/assets/24964308/a1f8a41d-5863-4d8f-a4a0-29bc38689964)
+
+So I got an error "53200FATAL: fatal llvm error: Unable to allocate section memory!" from PostgreSQL 14 at about 710M records into a test.  No problem, the consumers began to restart and the load hardly skipped a beat.  In that same minute, I googled the error and found that is the JIT compiler that is enabled by default using that memory.  My understanding is the JIT compiles reused SQL statements into binary code to more effectively execute.  It can be set off in the postgresql.conf with `jit=off` and `select pg_reload_conf()` can be used in psql to live reload that setting.  Immediately, performance went from a steady-state of about 870/s to 1500/s.
+
+Not believing this could be true, I turned it back on and immediately it dropped back down.  Then turned it off again and the performance went back up.
+
+From a database system behavior, the CPU for the select processes dropped dramatically while performance nearly doubled.  I'm still not sure why, but the test results are clear.
+
+
 ## BufferMapping and waits
 There are nice wait queries that I like to run during loads to see what the database is waiting on.
 
