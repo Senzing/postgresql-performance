@@ -21,6 +21,21 @@ This version has specific improvements to the handling of transactions and idle 
 lz4 TOAST compression may be a small win as it has significantly higher compression speeds.  In theory, this should reduce latency.  It can be enabled with `default_toast_compression='lz4'` on a new system.
 
 
+## Recommended Senzing Configuration changes
+Normally, I don't change the Senzing default configuration unless I want to add data sources, features, keys (e.g., NAMEADDR_KEY), etc.  Starting with Senzing 3.8.0, I do recommend that people with large datasets make one change to NOT have NAME_KEYs create a redo.  Prior to 3.8, new configurations have this disabled by default.  The reason was simple: Senzing doesn't make decisions solely on name, and the majority of NAME_KEYs end up generic, so you generic 25-50x the amount of redo during processing.
+
+So why did this change?  NAME_KEYs are actually based on only NAME or NAME in combination with other things (DOB, POSTAL_CODE, ADDR_CITY, LAST4_ID, etc).  Except in the NAME+DOB situation, we didn't make resolution or relationship decisions based on any of those combinations so it was nearly impossible anything might be sitting around based on a now generic value.  In fact, in the entire history of Senzing, I'm only aware of one instance where a customer noticed such a decision on NAME+DOB.
+
+What changed is that in 3.5 we started building relationships on close unique names to find more connections on smaller datasets where unique names are common.  We also have some people experimenting with resolving on some very loose/questionable criteria.  This caused [now] generic name-based decisions to be more common and in 3.8 a new configuration defaults to having redo enabled.
+
+Why turn it off on large systems?  Simply put the negative far outweighs the questionable benefit.  With large data, 1) you probably aren't configuring loose decision making and 2) the velocity/volume of data easily quickly takes care of things like relationships on now generic names... so would you likely never see it, anything you did see would be something like a name only possible match (weak) that is now generic.
+
+The change is simple.  Run G2ConfigTool.py and execute:
+```
+setGenericThreshold {"plan": "INGEST", "feature": "all", "behavior": "NAME", "candidateCap": 10, "scoringCap":-1, "sendToRedo": "No"}
+save
+```
+
 ## Well JIT!
 ![image](https://github.com/Senzing/postgresql-performance/assets/24964308/a1f8a41d-5863-4d8f-a4a0-29bc38689964)
 
