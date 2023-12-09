@@ -1,3 +1,6 @@
+-- NOTE: YOU [GENERALLY] DON'T PARTITION POSTGRESQL FOR PERFORMANCE.  The partition helps things like autovacuum, backup, and restore.
+-- If you don't need to partition for operational needs, you will almost certainly run Senzing faster without it.
+
 --
 -- RES_FEAT_EKEY
 --
