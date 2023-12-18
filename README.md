@@ -61,7 +61,7 @@ One thing you will find is that once you are seeing lots of LWLock:BufferMapping
 Here is an example of a load where the number of loading threads was changed from 768 to 384 to 192.  The dips are when the loaders were restarted with new settings.  Only at 192 did BufferMapping essentially disappear from being a wait event with performance dropping <5%, which could likely be recovered by increasing the threads slightly.
 ![image](https://github.com/Senzing/postgresql-performance/assets/24964308/de79e8f2-96f3-41b7-87cb-7ca00071ef43)
 
-The other side effect of monitoring BufferMapping is with autovacuum.  Autovacuum leverages those same buffers, and contention on them severely impacts the ability for autovacuum to keep up.  In the load above, the autovacuum was taking several times longer when there was contention.
+The other side effect of monitoring BufferMapping is with autovacuum.  Autovacuum leverages those same buffers, and contention on them severely impacts the ability of the autovacuum to keep up.  In the load above, the autovacuum was taking several times longer when there was contention.
 
 
 ## Partitioning
@@ -74,15 +74,11 @@ RES_ENT
 DSRC_RECORD
 ```
 
-It would be nice to partition LIB_FEAT and OBS_ENT also but they have 2 unique indexes which makes it incompatible with PostgreSQL partitioning.  Fortunately, I've found that LIB_FEAT and OBS_ENT rarely have a vacuum problem and, over time, will become more read heavy.
-
-Of course, some queries select records without including the partition key and instead use the secondary indexes.  This will use more CPU as they broadcast out the request to all partitions but, in my experience, vacuum and other operational issues are for more important than DB CPU.
-
-In this repository, you will find a `partitioning_mods.sql` file for the previously mentioned tables.
+In this repository, you will find a `partitioning_mods.sql` file for the latest.
 
 
 ## Governor
-Recommend setting the thresholds to 1.2B/1.5B to allow for more time to vacuum.  Also, the smaller difference in the values can help prevent the cost of expensive "double vacuum" where a "pause" is needed immediately after the initial vacuum as the XID is not dropped far enough.  I saw a reduction from 2-4 hours to <1hr in wait time on average by doing this.
+Recommend setting the thresholds to 1.2B/1.5B to allow for more time to vacuum.  Also, the smaller difference in the values can help prevent the cost of an expensive "double vacuum" where a "pause" is needed immediately after the initial vacuum as the XID is not dropped far enough.  I saw a reduction from 2-4 hours to <1hr in wait time on average by doing this.
 
 Along with those governor changes, you can make the autovacuum more aggressive and less likely to hit an expensive autovacuum with these settings:
 ```
@@ -138,12 +134,14 @@ When PostgreSQL updates a record it creates a new version (a copy) of the record
 The problem is that PostgreSQL by default fills 100% of a page in a table before splitting.  This means that there likely won't be room for this operation and some Senzing tables are updated frequently.  The negative of reducing the fillfactor is that it may increase disk space.  You may want to experiment with this yourself but for performance runs, I set the following:
 
 ```
-ALTER TABLE RES_RELATE SET ( fillfactor = 50 );
-ALTER TABLE RES_FEAT_STAT SET ( fillfactor = 50 );
-ALTER TABLE RES_FEAT_EKEY SET ( fillfactor = 50 );
-ALTER TABLE RES_ENT SET ( fillfactor = 50 );
-ALTER TABLE OBS_ENT SET ( fillfactor = 50 );
-ALTER TABLE DSRC_RECORD SET ( fillfactor = 50 );
+ALTER TABLE RES_RELATE SET ( fillfactor = 100 );
+ALTER TABLE LIB_FEAT SET ( fillfactor = 100 );
+ALTER TABLE RES_FEAT_STAT SET ( fillfactor = 90 );
+ALTER TABLE RES_FEAT_EKEY SET ( fillfactor = 90 );
+ALTER TABLE RES_ENT SET ( fillfactor = 90 );
+ALTER TABLE OBS_ENT SET ( fillfactor = 75 );
+ALTER TABLE RES_ENT_OKEY SET ( fillfactor = 75 );
+ALTER TABLE DSRC_RECORD SET ( fillfactor = 90 );
 ```
 
 NOTE: If you have partitioned tables, this must be done on each partition.
