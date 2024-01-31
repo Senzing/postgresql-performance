@@ -186,7 +186,10 @@ blockdev --setra 0 /dev/nvme*n1
 blockdev --report
 ```
 
-
-
-
+Drop extra tables and indexes
+```
+DROP TABLE DSRC_RECORD_HKEY, LIB_FEAT_HKEY, OBS_ENT_SKEY, RES_ENT_RKEY, RES_FEAT_LKEY;
+DROP TABLE OBS_FEAT_EKEY; -- ONLY IF THE TABLE IS COMPLETELY EMPTY
+DROP INDEX DSRC_RECORD_HK; -- 3.6 and newer
+```
 
