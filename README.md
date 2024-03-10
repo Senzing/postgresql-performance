@@ -80,47 +80,49 @@ In this repository, you will find a `partitioning_mods.sql` file for the latest.
 ## Governor
 Recommend setting the thresholds to 1.2B/1.5B to allow for more time to vacuum.  Also, the smaller difference in the values can help prevent the cost of an expensive "double vacuum" where a "pause" is needed immediately after the initial vacuum as the XID is not dropped far enough.  I saw a reduction from 2-4 hours to <1hr in wait time on average by doing this.
 
-Along with those governor changes, you can make the autovacuum more aggressive and less likely to hit an expensive autovacuum with these settings:
-```
-autovacuum_max_workers=16
-autovacuum_vacuum_cost_limit = 10000
-autovacuum_freeze_max_age = 1000000000
-autovacuum_multixact_freeze_max_age = 1200000000
-```
-
 The best setting for you may be different depending on the system you have.  I run pretty aggressively like:
 ```
-checkpoint_timeout = 2min               # range 30s-1d
-checkpoint_completion_target = 0.9      # checkpoint target duration, 0.0 - 1.0
+synchronous_commit=off
+
+lock_timeout = 500000
+idle_in_transaction_session_timeout=600000
+
+checkpoint_timeout = 2min
+checkpoint_completion_target = 0.9
 max_wal_size = 80GB
-min_wal_size = 80GB
+
+full_page_writes = off
+wal_init_zero = off
+wal_level = minimal
+wal_writer_delay = 10000ms
+wal_recycle = off
+max_wal_senders = 0
+
+effective_io_concurrency = 1000
+maintenance_io_concurrency = 1000
+max_parallel_maintenance_workers = 16
+max_parallel_workers_per_gather = 16
+max_worker_processes = 16
+max_parallel_workers = 16
+
 autovacuum_max_workers=16
 autovacuum_vacuum_cost_limit = 10000
-autovacuum_freeze_max_age = 1000000000
-autovacuum_multixact_freeze_max_age = 1200000000
-autovacuum_vacuum_threshold = 10000000  # min number of row updates before
-                                        # vacuum
-autovacuum_vacuum_insert_threshold = 10000000   # min number of row inserts
-                                        # before vacuum; -1 disables insert
-                                        # vacuums
-autovacuum_analyze_threshold = 0        # min number of row updates before
-                                        # analyze
-autovacuum_analyze_scale_factor = 0.2   # fraction of table size before analyze
-autovacuum_vacuum_scale_factor = 0      # fraction of table size before vacuum
-autovacuum_vacuum_insert_scale_factor = 0       # fraction of inserts over table
-                                        # size before insert vacuum
-autovacuum_vacuum_cost_delay = 1ms      # default vacuum cost delay for
-                                        # autovacuum, in milliseconds;
-                                        # -1 means use vacuum_cost_delay
-                                        log_autovacuum_min_duration = 100000    # log autovacuum activity;
-                                        # -1 disables, 0 logs all actions and
-                                        # their durations, > 0 logs only
-                                        # actions running at least this number
-                                        # of milliseconds.
-log_checkpoints = on
+vacuum_cost_page_hit = 0		# 0-10000 credits
+vacuum_cost_page_miss = 1		# 0-10000 credits
+vacuum_cost_page_dirty = 1		# 0-10000 credits
+vacuum_freeze_table_age=1000000000
+vacuum_freeze_min_age=200000000
+autovacuum_freeze_max_age = 1200000000
+autovacuum_multixact_freeze_max_age = 1500000000
+autovacuum_vacuum_scale_factor = 0.01
+autovacuum_vacuum_insert_scale_factor = 0.01
+autovacuum_vacuum_cost_delay = 0
+autovacuum_naptime = 1min
+
 
 default_toast_compression = 'lz4'       # 'pglz' or 'lz4'
 enable_seqscan = off
+random_page_cost = 1.1
 ```
 
 
@@ -172,17 +174,15 @@ cryptsetup --allow-discards --perf-no_read_workqueue --perf-no_write_workqueue -
 
 ## IO concurrency
 ```
-effective_io_concurrency = 10           # 1-1000; 0 disables prefetching
-maintenance_io_concurrency = 1000 # 1-1000; 0 disables prefetching
+effective_io_concurrency = 1000
+maintenance_io_concurrency = 1000
 ```
-I tend to use the above settings.  It is also important to set the block device read-ahead too.  I will set the NVME device read ahead to 0 and the MD RAID and DM devices to 10.  Seems to improve IO scaling.  Something like this:
+I tend to use the above settings.  It is also important to set the block device read-ahead too.  I will set the flash devices to 16 and DM devices to 256.  Since our access pattern is very random, I generally don't like read-ahead at all BUT PostgreSQL vacuum performs 3-4x better with readahead since it is a heavy sequential scan operation.  Hopefully PostgreSQL one day will support Direct IO and AsyncIO. Something like this:
 
 ```
 blockdev --report
-blockdev --setra 10 /dev/md127
-blockdev --setra 10 /dev/dm-2
-blockdev --setra 10 /dev/dm-3
-blockdev --setra 0 /dev/nvme*n1
+blockdev --setra 256 /dev/dm-*
+blockdev --setra 16 /dev/nvme*n1
 blockdev --report
 ```
 
