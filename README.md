@@ -21,6 +21,14 @@ This version has specific improvements to the handling of transactions and idle 
 lz4 TOAST compression may be a small win as it has significantly higher compression speeds.  In theory, this should reduce latency.  It can be enabled with `default_toast_compression='lz4'` on a new system.
 
 
+## PostgreSQL 16
+First, I wouldn't move here yet.  I have been eager to try it as it allows you to do an explain on generic query plans which is precisely what the PostgreSQL optimizer typically uses for Senzing's prepared statements.  That particular feature was immediately valuable.
+
+The problem is they made a pretty enormous change to vacuum/autovacuum.  Previously, maintenance processes had access to all of the shared_buffers to do their work, but in v16, they added a limiting parameter that defaults to 256kB and maxes out at 16GB.  When PostgreSQL is under heavy autovacuum load, the autovacuum processes end up VERY throttled on write.  I suspect that it is evicting pages from the shared_buffers and waiting on a substantially increased write workload.  I get why they did this and it prevents artificially "flushing" the shared_buffers as the maintenance processes do full table scans... but in Senzing's incredibly random workload, there is a good chance those pages get used within seconds and get evicted normally.  So this is an entirely unnecessary write workload.
+
+I'm not sure how to tune around this particular one yet.
+
+
 ## Recommended Senzing Configuration changes
 Normally, I don't change the Senzing default configuration unless I want to add data sources, features, keys (e.g., NAMEADDR_KEY), etc.  Starting with Senzing 3.8.0, I do recommend that people with large datasets make one change to NOT have NAME_KEYs create a redo.  Prior to 3.8, new configurations have this disabled by default.  The reason was simple: Senzing doesn't make decisions solely on name, and the majority of NAME_KEYs end up generic, so you generic 25-50x the amount of redo during processing.
 
@@ -45,6 +53,12 @@ Not believing this could be true, I turned it back on and immediately it dropped
 
 From a database system behavior, the CPU for the select processes dropped dramatically while performance nearly doubled.  I'm still not sure why, but the test results are clear.
 
+## pg_stat_statements
+This is really nice if you want to monitor what SQL statements the system is really spending time on and why.  Google how to enable it on your system.  I like to watch this SQL statement which consolidates types of Senzing SQL statements into one per row:
+
+```
+watch -n 10 psql -p 5432 -U postgres -w -h 127.0.0.1 g2 -c "\"select count(*), sum(calls) as calls, cast(sum(total_exec_time) as bigint) as total_exec_time, sum(rows) as rows, cast(sum(blk_read_time) as bigint) as blk_read_time, cast(sum(blk_write_time) as bigint) blk_write_time, sum(shared_blks_dirtied) as shared_blks_dirtied, sum(local_blks_dirtied) as local_blks_dirtied, sum(wal_records) as wal_records, trimmed_query from ( select  (case when strpos(query,'2') >0 then left(query,strpos(query,'2')) else query end ) as trimmed_query, * from pg_stat_statements) group by trimmed_query order by 3 desc;"\"
+```
 
 ## BufferMapping and waits
 There are nice wait queries that I like to run during loads to see what the database is waiting on.
@@ -181,7 +195,7 @@ I tend to use the above settings.  It is also important to set the block device 
 
 ```
 blockdev --report
-blockdev --setra 256 /dev/dm-*
+blockdev --setra 256 /dev/dm-* ## can also probably leave this as what the OS defaults to
 blockdev --setra 16 /dev/nvme*n1
 blockdev --report
 ```
