@@ -57,7 +57,7 @@ From a database system behavior, the CPU for the select processes dropped dramat
 This is really nice if you want to monitor what SQL statements the system is really spending time on and why.  Google how to enable it on your system.  I like to watch this SQL statement which consolidates types of Senzing SQL statements into one per row:
 
 ```
-watch -n 10 psql -p 5432 -U postgres -w -h 127.0.0.1 g2 -c "\"select count(*), sum(calls) as calls, cast(sum(total_exec_time) as bigint) as total_exec_time, sum(rows) as rows, cast(sum(blk_read_time) as bigint) as blk_read_time, cast(sum(blk_write_time) as bigint) blk_write_time, sum(shared_blks_dirtied) as shared_blks_dirtied, sum(local_blks_dirtied) as local_blks_dirtied, sum(wal_records) as wal_records, trimmed_query from ( select  (case when strpos(query,'2') >0 then left(query,strpos(query,'2')) else query end ) as trimmed_query, * from pg_stat_statements) group by trimmed_query order by 3 desc;"\"
+watch -n 10 psql -p 5432 -U postgres -w -h 127.0.0.1 g2 -c "\"select count(*), sum(calls) as calls, cast(sum(total_exec_time) as bigint) as total_exec_time, sum(rows) as rows, cast(sum(blk_read_time) as bigint) as blk_read_time, cast(sum(blk_write_time) as bigint) blk_write_time, sum(shared_blks_dirtied) as shared_blks_dirtied, sum(local_blks_dirtied) as local_blks_dirtied, sum(wal_records) as wal_records, cast(sum(io_time) as bigint) as io_time, trimmed_query from ( select  (case when strpos(query,'2') >0 then left(query,strpos(query,'2')) else query end ) as trimmed_query, blk_read_time+blk_write_time as io_time,* from pg_stat_statements) group by trimmed_query order by io_time desc;"\"
 ```
 
 ## BufferMapping and waits
