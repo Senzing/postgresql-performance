@@ -14,6 +14,8 @@ The primary configuration parameter to improve commit performance is to turn off
 
 There is more to pay attention to on your system though.  For instance, if replication is done synchronously then you end up with the same problem.  On AWS Aurora, replication to a different AZ forces synchronous commit back on.  As you are looking at the design of your database infrastructure, you will need to take these things into consideration.  To simplify things, customers will often do the initial historical loads without replication and set it up afterward when the DB performance needs tend to be much lower.
 
+See the [hardware setup](test_hardware.md) used for this testing.
+
 
 ## PostgreSQL 14
 This version has specific improvements to the handling of transactions and idle connections that can give substantial benefits for running OLTP applications like Senzing.  You can see if you are being impacted by the on previous versions of PostgreSQL by running `perf top` and looking for GetSnapshotData using significant CPU while the system is under load.  In my tests, this function was the largest consumer of CPU on the entire system.  This optimization is automatically enabled when you install 14.
@@ -27,6 +29,11 @@ First, I wouldn't move here yet.  I have been eager to try it as it allows you t
 The problem is they made a pretty enormous change to vacuum/autovacuum.  Previously, maintenance processes had access to all of the shared_buffers to do their work, but in v16, they added a limiting parameter that defaults to 256kB and maxes out at 16GB.  When PostgreSQL is under heavy autovacuum load, the autovacuum processes end up VERY throttled on write.  I suspect that it is evicting pages from the shared_buffers and waiting on a substantially increased write workload.  I get why they did this and it prevents artificially "flushing" the shared_buffers as the maintenance processes do full table scans... but in Senzing's incredibly random workload, there is a good chance those pages get used within seconds and get evicted normally.  So this is an entirely unnecessary write workload.
 
 I'm not sure how to tune around this particular one yet.
+
+
+## Autovacuum experiments
+
+Take a look [here](autovacuum.md) for some new work on autovacuum tuning with Senzing.
 
 
 ## Recommended Senzing Configuration changes
