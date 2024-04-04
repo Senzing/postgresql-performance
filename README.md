@@ -26,10 +26,10 @@ lz4 TOAST compression may be a small win as it has significantly higher compress
 ## PostgreSQL 16
 First, I wouldn't move here yet.  I have been eager to try it as it allows you to do an explain on generic query plans which is precisely what the PostgreSQL optimizer typically uses for Senzing's prepared statements.  That particular feature was immediately valuable.
 
-The problem is they made a pretty enormous change to vacuum/autovacuum.  Previously, maintenance processes had access to all of the shared_buffers to do their work, but in v16, they added a limiting parameter that defaults to 256kB and maxes out at 16GB.  When PostgreSQL is under heavy autovacuum load, the autovacuum processes end up VERY throttled on write.  I suspect that it is evicting pages from the shared_buffers and waiting on a substantially increased write workload.  I get why they did this and it prevents artificially "flushing" the shared_buffers as the maintenance processes do full table scans... but in Senzing's incredibly random workload, there is a good chance those pages get used within seconds and get evicted normally.  So this is an entirely unnecessary write workload.
-
-I'm not sure how to tune around this particular one yet.
-
+If you do move, make sure to set this to let autovacuum freely use the shared buffers.
+```
+vacuum_buffer_usage_limit=0
+```
 
 ## Autovacuum experiments
 
