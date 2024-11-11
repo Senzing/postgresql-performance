@@ -17,10 +17,15 @@ There is more to pay attention to on your system though.  For instance, if repli
 See the [hardware setup](test_hardware.md) used for this testing.
 
 
-## PostgreSQL 14
-This version has specific improvements to the handling of transactions and idle connections that can give substantial benefits for running OLTP applications like Senzing.  You can see if you are being impacted by the on previous versions of PostgreSQL by running `perf top` and looking for GetSnapshotData using significant CPU while the system is under load.  In my tests, this function was the largest consumer of CPU on the entire system.  This optimization is automatically enabled when you install 14.
+## PostgreSQL 17
+I am liking PostgreSQL 17 a lot.  It looks to be the best release since 14.  I suspect the improvements are a result of the WAL efficiency improvements and streaming IO.
 
-lz4 TOAST compression may be a small win as it has significantly higher compression speeds.  In theory, this should reduce latency.  It can be enabled with `default_toast_compression='lz4'` on a new system.
+This was the first time I've been able to run a non-partitioned schema (used the index mods) and it finished faster than partitioned runs.  In the past, I've never let a non-partitioned run finish as the downtime from XID paused almost completely stalled processing.  With v17 I was still processing ~100M records a day on the test system even with the pauses.  This change was helpful:
+```
+autovacuum_work_mem = 1GB
+```
+
+A reminder, you do NOT partition for speed but only for operational needs.  With the partitioned schema, I see 20% more IO and the box is CPU saturated... resulting in 20% lower peak performance rates and even a select count(*) on a table gives a notable performance hit near the end.  I will likely be reducing the number of partitions in the default mods as v17 is performance better.
 
 
 ## PostgreSQL 16
@@ -30,6 +35,13 @@ If you do move, make sure to set this to let autovacuum freely use the shared bu
 ```
 vacuum_buffer_usage_limit=0
 ```
+
+
+## PostgreSQL 14
+This version has specific improvements to the handling of transactions and idle connections that can give substantial benefits for running OLTP applications like Senzing.  You can see if you are being impacted by the on previous versions of PostgreSQL by running `perf top` and looking for GetSnapshotData using significant CPU while the system is under load.  In my tests, this function was the largest consumer of CPU on the entire system.  This optimization is automatically enabled when you install 14.
+
+lz4 TOAST compression may be a small win as it has significantly higher compression speeds.  In theory, this should reduce latency.  It can be enabled with `default_toast_compression='lz4'` on a new system.
+
 
 ## Autovacuum experiments
 
