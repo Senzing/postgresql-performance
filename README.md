@@ -94,7 +94,7 @@ One thing you will find is that once you are seeing lots of LWLock:BufferMapping
 Here is an example of a load where the number of loading threads was changed from 768 to 384 to 192.  The dips are when the loaders were restarted with new settings.  Only at 192 did BufferMapping essentially disappear from being a wait event with performance dropping <5%, which could likely be recovered by increasing the threads slightly.
 ![image](https://github.com/Senzing/postgresql-performance/assets/24964308/de79e8f2-96f3-41b7-87cb-7ca00071ef43)
 
-The other side effect of monitoring BufferMapping is with autovacuum.  Autovacuum leverages those same buffers, and contention on them severely impacts the ability of the autovacuum to keep up.  In the load above, the autovacuum was taking several times longer when there was contention.
+The other side effect of monitoring BufferMapping is with autovacuum.  Autovacuum (before v16) leverages those same buffers, and contention on them severely impacts the ability of the autovacuum to keep up.  In the load above, the autovacuum was taking several times longer when there was contention.
 
 
 ## Partitioning
