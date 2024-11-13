@@ -20,7 +20,7 @@ See the [hardware setup](test_hardware.md) used for this testing.
 ## PostgreSQL 17
 I am liking PostgreSQL 17 a lot.  It looks to be the best release since 14.  I suspect the improvements are a result of the WAL efficiency improvements and streaming IO.
 
-This was the first time I've been able to run a non-partitioned schema (used the index mods) and it finished faster than partitioned runs.  In the past, I've never let a non-partitioned run finish as the downtime from XID paused almost completely stalled processing.  With v17 I was still processing ~100M records a day on the test system even with the pauses.  This change was helpful:
+This was the first time I've been able to run a non-partitioned schema (used the index mods) and it finished faster than prioir (<17) partitioned runs.  In the past, I've never let a non-partitioned run finish as the downtime from XID paused almost completely stalled processing.  With v17 I was still processing ~100M records a day on the test system even with the pauses.  This change was helpful:
 ```
 autovacuum_work_mem = 1GB
 ```
