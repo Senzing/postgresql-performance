@@ -1,10 +1,11 @@
 ## Autovacuum experiments
 
-Autovacuum is a pain.  I spend more time dealing with making that work well than anything else with PostgreSQL.  I've recently tried a very different approach to try to best optimize autovaccum.
+Autovacuum is a pain. I spend more time dealing with making that work well than anything else with PostgreSQL. I've recently tried a very different approach to try to best optimize autovaccum.
 
 This become even more important with PostgreSQL v16 where autovacuum was a bottleneck even at the beginning of the load.
 
 ### postgresql.conf
+
 ```
 log_autovacuum_min_duration = 100000    # log autovacuum activity;
 autovacuum_max_workers=16
@@ -17,12 +18,13 @@ vacuum_cost_page_dirty = 1
 vacuum_buffer_usage_limit=16GB # new in v16
 ```
 
-This marks a significant departure from what I've done before.  This lets the system largely default to what it normally does.
+This marks a significant departure from what I've done before. This lets the system largely default to what it normally does.
 
-vacuum_cost: I really just care any time a page is dirty and needs to be processed so set the costs on reads to zero.  With the default (low) cost delay, if an autovacuum is doing real write work it will be seen in VacuumDelay a lot.
+vacuum_cost: I really just care any time a page is dirty and needs to be processed so set the costs on reads to zero. With the default (low) cost delay, if an autovacuum is doing real write work it will be seen in VacuumDelay a lot.
 
 ### Altering specific tables
-Then I went to see what the counts would be on the most troublesome modified tables by doing `select pg_stat_resest()` and coming back two hours later to execute a query to see what happened.
+
+Then I went to see what the counts would be on the most troublesome modified tables by doing `select pg_stat_reset()` and coming back two hours later to execute a query to see what happened.
 
 Note: this one was after >12hrs
 
@@ -72,6 +74,7 @@ select relname,n_tup_ins,n_tup_upd,n_tup_del, (n_tup_ins+n_tup_upd+n_tup_del) as
 ```
 
 So first, with LIB_FEAT, this confirms what we already know: that it is an insert-only table. One of the things with insert-only tables is that you can completely disable the default behavior for auto-vacuum to periodically table scale to freeze tuples. Also, that two hours was about 40M inserts per partition, and I decided to make it so autovacuum would trigger on partitions about every two hours.
+
 ```
 alter table LIB_FEAT_0_NEW set (autovacuum_freeze_min_age = 0,autovacuum_vacuum_insert_scale_factor=0,autovacuum_vacuum_insert_threshold=40000000);
 alter table LIB_FEAT_1_NEW set (autovacuum_freeze_min_age = 0,autovacuum_vacuum_insert_scale_factor=0,autovacuum_vacuum_insert_threshold=40000000);
@@ -79,7 +82,8 @@ alter table LIB_FEAT_2_NEW set (autovacuum_freeze_min_age = 0,autovacuum_vacuum_
 alter table LIB_FEAT_3_NEW set (autovacuum_freeze_min_age = 0,autovacuum_vacuum_insert_scale_factor=0,autovacuum_vacuum_insert_threshold=40000000);
 ```
 
-Next up, with RES_FEAT_EKEY, it does have updates/deletes but at a rate substantially lower than inserts.  This change causes it to autovacuum every 40M inserts or 1M regular changes.  We let it freeze to its thing, though how much that helps is up for debate.
+Next up, with RES_FEAT_EKEY, it does have updates/deletes but at a rate substantially lower than inserts. This change causes it to autovacuum every 40M inserts or 1M regular changes. We let it freeze to its thing, though how much that helps is up for debate.
+
 ```
 alter table RES_FEAT_EKEY_0_NEW set (autovacuum_vacuum_insert_scale_factor=0,autovacuum_vacuum_insert_threshold=40000000,autovacuum_vacuum_scale_factor=0,autovacuum_vacuum_threshold=1000000);
 alter table RES_FEAT_EKEY_1_NEW set (autovacuum_vacuum_insert_scale_factor=0,autovacuum_vacuum_insert_threshold=40000000,autovacuum_vacuum_scale_factor=0,autovacuum_vacuum_threshold=1000000);
@@ -91,7 +95,8 @@ alter table RES_FEAT_EKEY_6_NEW set (autovacuum_vacuum_insert_scale_factor=0,aut
 alter table RES_FEAT_EKEY_7_NEW set (autovacuum_vacuum_insert_scale_factor=0,autovacuum_vacuum_insert_threshold=40000000,autovacuum_vacuum_scale_factor=0,autovacuum_vacuum_threshold=1000000);
 ```
 
-Lastly, RES_FEAT_STAT has inserts and many updates. Since the updates are random, they tend to touch many pages, so freezing likely has little benefit, so we turn it off.  For this one we turn off freeze scans and track to 40M inserts or 20M update/deletes.
+Lastly, RES_FEAT_STAT has inserts and many updates. Since the updates are random, they tend to touch many pages, so freezing likely has little benefit, so we turn it off. For this one we turn off freeze scans and track to 40M inserts or 20M update/deletes.
+
 ```
 alter table RES_FEAT_STAT_0_NEW set (autovacuum_freeze_min_age = 0,autovacuum_vacuum_insert_scale_factor=0,autovacuum_vacuum_insert_threshold=40000000,autovacuum_vacuum_scale_factor=0,autovacuum_vacuum_threshold=2000000);
 alter table RES_FEAT_STAT_1_NEW set (autovacuum_freeze_min_age = 0,autovacuum_vacuum_insert_scale_factor=0,autovacuum_vacuum_insert_threshold=40000000,autovacuum_vacuum_scale_factor=0,autovacuum_vacuum_threshold=2000000);
@@ -103,6 +108,7 @@ alter table RES_FEAT_STAT_6_NEW set (autovacuum_freeze_min_age = 0,autovacuum_va
 alter table RES_FEAT_STAT_7_NEW set (autovacuum_freeze_min_age = 0,autovacuum_vacuum_insert_scale_factor=0,autovacuum_vacuum_insert_threshold=40000000,autovacuum_vacuum_scale_factor=0,autovacuum_vacuum_threshold=2000000);
 ```
 
-That is it... the rest of the tables are substantially less active and are active in ways than the default settings.  Every once in an OBS_ENT or other table will come up with an aggressive vacuum, but this solved two problems for me:
+That is it... the rest of the tables are substantially less active and are active in ways than the default settings. Every once in an OBS_ENT or other table will come up with an aggressive vacuum, but this solved two problems for me:
+
 1. In v16, I basically ended up with all 16 autovacuum workers busy the entire load
 2. Since the default thresholds were percentage-based, most of the tables/partitions grow at similar rates, so they all needed to be autovacuumed at the same time.
